@@ -1,163 +1,176 @@
+// const dash = require('dashdash');
+// const fetch = require('node-fetch');
+// const fs = require('fs');
+// const Headers = fetch.Headers;
+// const options = {
+//   allowUnknown: true,
+//   options: [{
+//     names: ['output', 'o'],
+//     type: 'string',
+//     help: 'file in which to store the fetched data'
+//   },
+//   {
+//     names: ['header', 'H'],
+//     type: 'string',
+//     help: 'Adding info to header'
+//   },
+//   {
+//     names: ['A'],
+//     type: 'string',
+//     help: 'Set the user agent header'
+//   },
+//   {
+//     names: ['e'],
+//     type: 'string',
+//     help: 'Set referer header'
+//   },
+//   {
+//     names: ['dump-header'],
+//     type: 'string',
+//     help: 'Dumping meta-data from header into file'
+//   },
+//   {
+//     names: ['data', 'd'],
+//     type: 'string',
+//     help: 'Data for body of post fetch request'
+//   },
+//   {
+//     names: ['verbose', 'v'],
+//     type: 'arrayOfBool',
+//     help: 'Verbose output. Use multiple times for more verbose.'
+//   }
+//   ]
+// };
+
+// const parser = dash.createParser(options);
+// const opts = parser.parse(options);
+// const optsObject = {};
+// opts['_order'].forEach(obj => {
+//   optsObject[obj.key] = obj.value;
+// });
+
+// const url = opts['_args'][0];
+// const init = optsObject.data;
+// console.log(url, opts);
+// fetch(url, init)
+//   .then(res => {
+//     const header = res.headers;
+//     let header_string = `HTTP/1.1 ${res.status} ${res.statusText}\n`;
+//     for (let pair of header.entries()) {
+//       header_string += `${pair[0][0].toUpperCase()}${pair[0].slice(1)}: ${pair[1]}\n`
+//     }
+//   });
+
+// let myHeader = new Headers();
+// myHeader.append('Content-Type', 'application / json');
+
+// node curl.js - A "MSIE v6.5" - d '{"key": true}' \
+// --dump - header header.txt - H "Accept: application/json" \
+// --header "Content-Type: application/json" - o response.txt \
+// https://artii.herokuapp.com/make?text=curl++this
+
+
 const dash = require('dashdash');
 const fetch = require('node-fetch');
 const fs = require('fs');
-const Headers = fetch.Headers;
-// const http = require('http');
-
-// fetch('.herokuapp.com/make?text')
-//   // .then(res => {
-//   //   // console.log(Headers);
-//   //   // console.log(res.headers.raw());
-//   //   console.log(res.body);
-//   // });
-//   .then(res => res.text())
-//   .then(text => console.log(text))
-//   // .then(fsPromise)
-//   .catch(reason => console.log(reason));
 
 const options = {
   allowUnknown: true,
   options: [{
     names: ['output', 'o'],
+    type: 'arrayOfString',
+    help: 'file in which to store the fetched content'
+  }, {
+    names: ['header', 'H'],
+    type: 'arrayOfString',
+    help: 'an arbitrary header to set on the fetch'
+  }, {
+    names: ['agent', 'A'],
     type: 'string',
-    help: 'file in which to store the fetched data'
-  },
-  {
-    name: 'version',
-    type: 'bool',
-    help: 'Print tool version and exit.'
-  },
-  {
+    help: 'set the user agent'
+  }, {
+    names: ['referer', 'e'],
+    type: 'string',
+    help: 'set the URL of the referer'
+  }, {
     names: ['help', 'h'],
     type: 'bool',
-    help: 'Print this help and exit.'
-  },
-  {
-    names: ['verbose', 'v'],
-    type: 'arrayOfBool',
-    help: 'Verbose output. Use multiple times for more verbose.'
-  },
-  {
-    names: ['file', 'f'],
-    type: 'string',
-    help: 'File to process',
-    helpArg: 'FILE'
-  },
-  {
-    names: ['header', 'H'],
-    type: 'string',
-    help: 'Adding info to header'
-  },
-  {
-    names: ['A'],
-    type: 'string',
-    help: 'Set the user agent header'
-  },
-  {
-    names: ['e'],
-    type: 'string',
-    help: 'Set referer header'
-  },
-  {
+    help: 'print this help and exit'
+  }, {
     names: ['dump-header'],
     type: 'string',
-    help: 'putting meta-data information in file'
-  },
-  {
+    help: 'the file to which response headers should be dumped'
+  }, {
     names: ['data', 'd'],
     type: 'string',
-    help: 'data for body of fetch request'
-  }
-  ]
+    help: 'data to send with the request'
+  }, {
+    names: ['method', 'X'],
+    type: 'string',
+    help: 'the HTTP method to use'
+  }]
 };
-
 const parser = dash.createParser(options);
 
 const opts = parser.parse(options);
+const { agent, data, dump_header, header = [], help, method, output = [], referer, _args: urls } = opts;
 
-console.log('Options are:', opts);
-
-const output = opts.dump_header;
-const url = opts._args[0];
-const order = options._order;
-
-for (let key in order) {
-  order[key] = order[value];
+if (help) {
+  console.log('node curl.js [OPTIONS] URL');
+  console.log('OPTIONS:');
+  console.log(parser.help().trimRight());
+  return;
 }
 
-// console.log(output, url);
-const bodyObj = {
-  body: 'string'
-}
-fetch(url, bodyObj)
-  .then(res => {
-    let headers = res['headers'];
-    console.log(headers.get('content-length'));
-    console.log(headers.get('content-type'));
-    console.log(headers.get('server'));
-    console.log(headers.get('date'));
-    console.log(headers.get('via'));
-    const obj = {
-      'content-length': headers.get('content-length'),
-      'content-type': headers.get('content-type'),
-      'server': headers.get('sever'),
-      'date': headers.get('date'),
-      'via': headers.get('via'),
+let out = [];
+for (let o of output) {
+  const stream = fs.createWriteStream(o)
+  stream.on('error', error => {
+    if (error.code === 'EISDIR') {
+      return console.error(`curl: (23) Failed writing body`);
     }
-
-    // const data = JSON.stringify(obj);
-    return obj;
-
-    // for (let key in res) {
-    //   if (key === 'headers') {
-    //     console.log(res[key]);
-    //     let header = res[key];
-    //     for (let keys in header) {
-    //       console.log(keys);
-    //       console.log(header[keys]);
-    //     }
-    //   }
-    //   console.log(key);
-    //   console.log(res[key]);
-    // }
-  })
-  .then(data => {
-    let str = '';
-    for (let key in data) {
-      str += key + ":" + data[key] + '\n';
-    }
-    fs.promises.writeFile(output, str)
+    process.exit(23);
   });
-// .then(res => res.text())
-// .then(text => fs.promises.writeFile(output, text))
-// .catch(reason => console.log(reason));
+  out.push(stream);
+}
 
+const meta = new Map();
+for (let h of header) {
+  const [key, value] = h.split(':').map(x => x.trim());
+  meta.set(key, value);
+}
+if (agent) {
+  meta.set('User-Agent', agent);
+}
+if (referer) {
+  meta.set('Referer', referer);
+}
 
-// const option = {
-//   hostname: 'https://artii.herokuapp.com/make?text=curl++this',
-//   port: 443,
-//   path: '',
-//   method: 'GET'
-// }
-// const req = http.request(option, res => {
-//   console.log(`statusCode: ${res.statusCode}`)
+const filesToFetch = [];
+for (let url of urls) {
+  const options = { body: data, headers: new fetch.Headers(meta), method };
+  filesToFetch.push(fetch(url, options));
+}
 
-//   res.on('data', d => {
-//     process.stdout.write(d)
-//   });
-// });
-
-// req.on('error', error => {
-//   console.error(error)
-// });
-
-// req.end();
-
-let myHeader = new Headers();
-//console.log(myHeader.append('Accept', 'application / json'));
-myHeader.append('Content-Type', 'application / json');
-// console.log(myHeader);
-// for (let key in myHeader) {
-//   console.log(key);
-//   console.log(myHeader.key);
-// }
+Promise.all(filesToFetch)
+  .then(responses => {
+    const promises = [responses];
+    if (dump_header) {
+      const headerLines = [
+        `HTTP/1.1 ${response.status} ${response.statusText}`
+      ];
+      for (let key of response.headers.keys()) {
+        headerLines.push(`${key}: ${response.headers.get(key)}`);
+      }
+      promises.push(fs.promises.writeFile(dump_header, headerLines.join('\n')));
+    }
+    return Promise.all(promises);
+  })
+  .then(([responses, _]) => responses.map((res, i) => res.body.pipe(out[i] || process.stdout)))
+  .catch(error => {
+    if (error.code === 'ENOTFOUND') {
+      const host = new URL(url).host;
+      return console.error(`curl: (6) Could not resolve host: ${host}`);
+      process.exit(6);
+    }
+  });
